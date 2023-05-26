@@ -1,7 +1,7 @@
 .PHONY: all clean
 
 TARGET = manual.pdf
-SOURCE = manual.md hysteresis.svg
+SOURCE = manual.md digits.png segments.png segments-example.png
 
 all: $(TARGET)
 

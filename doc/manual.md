@@ -1,6 +1,6 @@
 ---
 title: "Instrukcja laboratorium systemów wbudowanych"
-subtitle: "Ćwiczenie 7: Sterowanie z histerezą i dostęp do pamięci EEPROM mikrokontrolera"
+subtitle: "Ćwiczenie 9: Programowe tłumienie drgań styków i&nbsp;multipleksowanie wyświetlacza siedmiosegmentowego"
 author: [Mariusz Chilmon <<mariusz.chilmon@ctm.gdynia.pl>>]
 lang: "pl"
 titlepage: yes
@@ -11,70 +11,72 @@ header-includes: |
   \usepackage{gensymb}
 ...
 
-> People think that computer science is the art of geniuses but the actual reality is the opposite, just many people doing things that build on eachother, like a wall of mini stones.
+> If you can't describe what you are doing as a process, you don't know what you're doing.
 >
-> — _Donald Knuth_
+> — _W. Edwards Deming_
 
 # Cel ćwiczenia
 
 Celem ćwiczenia jest zapoznanie się z:
 
-* realizacją menu konfiguracyjnego na wyświetlaczu alfanumerycznym,
-* sterowaniem temperaturą z uwzględenieniem histerezy,
-* obsługą wbudowanej w mikrokontroler pamięci EEPROM.
+* programowym tłumieniem drgań styków,
+* definiowanie cyfr na wyświetlaczu siedmiosegmentowym,
+* multipleksowaniem wyświetlacza siedmiosegmentowego.
 
 # Uruchomienie programu wyjściowego
 
-1. Umieść zworki na pinach `RS`, `E` i `D4`…`D7` złącza `J10` (na lewo od buzzera).
-1. Zworkę `J15` (nad buzzerem) ustaw w pozycji `RW->GND`.
-1. Umieść wyświetlacz w złączu `DIS1`.
-1. Podłącz pin `1WIRE` pod wyświetlaczem siedmiosegmentowym LED do pinu `PD0` mikrokontrolera.
-1. Podłącz pin `ENC0 B` pod wyświetlaczem siedmiosegmentowym LED do pinu `PD1` mikrokontrolera.
-1. Podłącz pin `ENC0 A` pod wyświetlaczem siedmiosegmentowym LED do pinu `PD2` mikrokontrolera.
-1. Podłącz diodę `LED1` do pinu `PD3` mikrokontrolera.
-1. Podłącz pin `ENC0 SW` pod wyświetlaczem siedmiosegmentowym LED do pinu `PD4` mikrokontrolera.
-1. Po włączeniu zasilania wyświetlacz pokaże bieżącą temperaturę `Tcurrent` oraz temperaturę zadaną `Tt`.
-1. Po wciśnięciu przyciska impulsatora możliwe jest ustawienie temperatury zadanej.
-1. Gdy temperatura bieżąca jest niższa od zadanej, włączana jest `LED1`.
+1. Segmenty i kropkę `A`…`H` wyświetlacza siedmiosegmentowego podłącz do kolejnych pinów `PA0`…`PA7` mikrokontrolera.
+1. Cyfry `DIG1`…`DIG4` wyświetlacza siedmiosegmentowego podłącz do kolejnych pinów `PB0`…`PB3` mikrokontrolera.
+1. Przyciski `K1` i `K2` podłącz do pinów `PB4` i `PB5` mikrokontrolera.
+1. Na wyświetlaczu widoczna jest pojedyncza cyfra _0_.
 
 # Zadanie podstawowe
 
 ## Wymagania funkcjonalne
 
-Celem zadania podstawowego jest dodanie do termostatu regulowanej histerezy oraz rozbudowa menu obsługiwanego przez wyświetlacz alfanumeryczny i impulsator.
+Celem zadania podstawowego jest wykorzystanie multipleksowania w celu wyświetlania kolejnych liczb:
 
-![Histereza w termostacie sterującym grzałką](hysteresis.svg){width=400px}
+1. Wyświetlane są kolejne liczby, począwszy od `0000`.
+1. Częstotliwość multipleksowania jest na tyle duża, że migotanie ekranu jest niewidoczne.
 
-Zadaniem histerezy jest zmniejszenie częstotliwości przełączania elementu wykonawczego, kosztem zmniejszenia precyzji regulowanego parametru.
+Szybkość zmiany liczb nie jest krytyczna. Ważne jest, by można było zweryfikować poprawność wyświetlania poszczególnych cyfr.
 
-W naszym przypadku, gdy mierzona temperatura oscyluje wokół temperatury zadanej $T_t$ np. z powodu ruchu powietrza w pomieszczeniu albo szumu pomiarowego, może dojść do sytuacji, gdy element wykonywaczy byłby przełączany w bardzo krótkich odcinkach czasu. Jest to zjawisko, które może być szkodliwe dla elementu sterującego (np. w przekaźniku może dojść do wypalenia styków), jak i dla elementu wykonawczego (np. kompresor w lodówce może ulec szybkiemu zużyciu).
+![Sterowanie poszczególnymi cyframi](digits.png)
 
-Histereza zazwyczaj jest jednym z parametrów, które są dostępne dla użytkownika jako nastawa, co pozwala mu ustalić kompromis między precyzją sterowania a częstotliwością przełączania.
+![Kolejność segmentów](segments.png){width=200px}
+
+![Przykład wyświetlania cyfry _1_](segments-example.png){width=200px}
 
 ## Modyfikacja programu
 
-1. Dodaj do klasy `Menu` obsługę jeszcze jednego obiektu typu `Parameter`, który będzie odpowiedzialny za wyświetlanie i zmianę wartości histerezy.
-1. Ogranicz zakres zmian temperatury zadanej do zakresu 0°C…40°C, a histerezy do zakresu 0°C…5°C.
-1. Zmodyfikuj metodę `Thermostat::onTemperature()` tak, by uwzględniała temperaturę zadaną $T_t$ i histerezę $T_h$, tj. włączenie grzałki ma następować przy temperaturze $T_t + T_h$ zaś wyłączenie przy temperaturze $T_t - T_h$.
+1. W metodzie `LedDisplay::refresh()` włączaj cyklicznie kolejne cyfry wyświetlacza.
+1. W pliku `timer.cpp` zmień nastawy preskalera (bity `CS00`…`CS02`) i/lub wartość wpisywaną do rejestru `OCR0A`, by zwiększyć częstotliwość wywoływania metody `LedDisplay::refresh()`.
+1. W obsłudze przerwania `ISR(TIMER0_COMPA_vect)` wpisuj do tablicy `displayBuffer.digits[]` kolejne liczby.
+1. Uzupełnij zawartość tablicy `DIGITS` o wzorce pozostałych cyfr. Najmniej znaczący bit (LSB) to segment _A_, zaś najbardziej znaczący (MSB) — kropka _DP_ (oznaczona na naszej płytce jako segment _H_).
+1. W metodzie `LedDisplay::refresh()` wyświetl zawartość tablicy `displayBuffer.digits[]`, wykorzystując wzorce z tablicy `DIGITS`.
+
+\awesomebox[purple]{2pt}{\faMicrochip}{purple}{Multipleksowanie polega na tym, że np. czterocyfrowy wyświetlacz złożony łącznie z $8\cdot4=32$ segmentów (wliczając kropki dziesiętne) można obsłużyć za pomocą znacznie mniejszej liczby pinów mikrokontrolera. W przypadku wświetlaczy LED na ogół wykorzystuje się część pinów do włączania na krótki czas pojedynczych cyfr i 8 pinów do włączania segmentów w aktualnie wybranej cyfrze, co w naszym przykładzie oznacza zapotrzebowanie na $8+4=12$ pinów.}
+
+\awesomebox[purple]{2pt}{\faMicrochip}{purple}{Mikrokontroler taktowany jest zegarem 8MHz. W przypadku wykorzystania przerwania od komparatora \textit{A} timera częstotliwość ta najpierw dzielona jest przez wartość preskalera, a następnie przez wartość rejestru \lstinline{OCR0A}.}
 
 # Zadanie rozszerzone
 
+Celem zadania podstawowego jest oprogramowanie przycisków `K1` (_Start_) i `K2` (_Stop_), sterujących stoperem.
+
 ## Wymagania funkcjonalne
 
-Celem zadania rozszerzonego jest dodanie do termostatu nieulotnej pamięci temperatury zadanej.
-
-1. Po wyjściu z edycji nastaw ustawione wartości zapisywane są w pamięci EEPROM mikrokontrolera.
-1. Po zresetowaniu mikrokontrolera wczytywana jest zapamiętana temperatura.
+1. Szybkość odliczania wynosi 100Hz, więc pierwsze dwie cyfry odmierzają sekundy, a kolejne dwie — setne części sekundy.
+1. Część całkowitą od ułamkowej oddziela kropka (segment `H`) zaświecony na drugiej (`DIG2`) cyfrze.
+1. Przycisk `K1` (_Start_) uruchamia i zatrzymuje stoper.
+1. Przycisk `K2` (_Reset_) zeruje stoper.
+1. Urządzenie reaguje natychmiast, nawet na bardzo krótkie wciśnięcie przycisków.
+1. Każde naciśnięcie przycisku `K1` (_Start_) jest interpretowane jako pojedyncze zdarzenie (wyeliminowany jest efekt drgania styków).
+1. Powinna być możliwość odmierzenia interwału &lt;1&nbsp;s.
 
 ## Modyfikacja programu
 
-1. Do klasy `Settings` dodaj metody `save()` i `restore()`, które — odpowiednio — zapiszą i&nbsp;przywrócą z pamięci EEPROM temperaturę zadaną i histerezę.
-1. Wywołaj je w metodzie `Menu::onEncoderPress()` i w funkcji `main()`.
+1. W metodzie `LedDisplay::refresh()` dodaj zaświecanie kropki.
+1. W pliku `timer.cpp` zmień nastawy preskalera (bity `CS00`…`CS02`) i/lub wartość wpisywaną do rejestru `OCR0A`, by uzyskać częstotliwość, która pozwoli odmierzać czas 0,01&nbsp;s.
+1. W obsłudze przerwania `ISR(TIMER0_COMPA_vect)` wykorzystaj metodę `keypad.key()` obiektu klawiatury, by reagować na wciśnięcia przycisku.
 
-\awesomebox[purple]{2pt}{\faMicrochip}{purple}{Pamięć EEPROM ma ograniczoną liczbę cykli czyszczenia/zapisu (w przypadku mikrokokntrolerów AVR gwarantowana wartość to 100~000), należy więc zadbać, by ograniczyć miejsca w~programie, gdzie może następować zapis.}
-
-\awesomebox[teal]{2pt}{\faCode}{teal}{W pliku nagłówkowym \lstinline{avr/eeprom.h} zadeklarowane są funkcje obsługujące pamięć EEPROM. Należy zauważyć, że zamiast funkcji z grupy \lstinline{eeprom_write_XXX()} warto użyć funkcji \lstinline{eeprom_update_XXX()}, które dokonują zapisu tylko, gdy nowa wartość różni się od poprzedniej.}
-
-\awesomebox[purple]{2pt}{\faMicrochip}{purple}{Wyczyszczona pamięć EEPROM nie jest wypełniona bajtami \lstinline{0x00}, ale \lstinline{0xFF}. Jest to częsta cecha pamięci nieulotnych.}
-
-\awesomebox[teal]{2pt}{\faCode}{teal}{Liczba zmiennoprzecinkowa, w której wszystkie bity wykładnika są ustawione (co ma miejsce w wyczyszczonej pamięci EEPROM), nie jest poprawną wartością, ale \textit{nie-liczbą} (ang. \textit{NaN} — \textit{Not a Number}). Wartość taką można wykryć za pomocą makra \lstinline{isnan()} zdefiniowanego w pliku nagłówkowym \lstinline{math.h}.}
+\awesomebox[purple]{2pt}{\faMicrochip}{purple}{Timer0 jest 8-bitowy. Jeżeli preskaler oraz rejestr \lstinline{OCR0A} nie pozwalają na uzyskanie pożądanej wartości podziału, można ją uzyskać odliczając dodatkowe cykle programowo w obsłudze przerwania.}
